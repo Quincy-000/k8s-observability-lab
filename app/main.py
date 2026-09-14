@@ -2,7 +2,9 @@ import queue
 import threading
 import time
 
-from fastapi import FastAPI
+
+
+from fastapi import FastAPI, Response, Query
 
 app = FastAPI()
 job_queue = queue.Queue()
@@ -12,18 +14,24 @@ job_queue = queue.Queue()
 def healthz():
     return {"status": "ok"}
 
+ 
+
 @app.get("/readyz")
 def readyz():
     if worker_thread.is_alive():
         return {"status": "ready"}
-    return {"status": "not ready"}
+    return Response(
+        status_code=503,
+        content='{"status":"not ready"}',
+        media_type="application/json",
+    )
 
 @app.get("/")
 def root():
     return {"service": "pulse"}
-
+ 
 @app.post("/jobs")
-def add_jobs(count: int):
+def add_jobs(count: int = Query(..., ge=0, le=1000)):
     for i in range(count):
         job_queue.put(i)
     return {"added": count}
