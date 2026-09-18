@@ -71,15 +71,7 @@ def fault_error(rate: int = Query(..., ge=0, le=100)):
     fault_state["error_rate"] = rate
     return {"error_rate": rate}
 
-@app.post("/fault/cpu")
-def fault_cpu(seconds: int = Query(..., ge=0, le=30)):
-    end_time = time.time() + seconds
-    while time.time() < end_time:
-        pass
-    return {"cpu_seconds": seconds}
-
-
-        
+    
 def worker():
     while True:
         job = job_queue.get()
@@ -101,6 +93,7 @@ def burn_cpu(seconds: int):
 
 @app.post("/fault/cpu")
 def fault_cpu(seconds: int = Query(..., ge=0, le=30)):
+    fault_state["cpu_seconds"] = seconds
     threading.Thread(target=burn_cpu, args=(seconds,), daemon=True).start()
     return {"cpu_seconds": seconds}    
 
