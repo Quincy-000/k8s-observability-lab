@@ -101,8 +101,16 @@ memory_hog = []
 
 @app.post("/fault/memory")
 def fault_memory(mb: int = Query(..., ge=0, le=200)):
+    current_total = sum(len(chunk) for chunk in memory_hog) // (1024 * 1024)
+    if current_total + mb > 200:
+        return Response(
+            status_code=429,
+            content='{"error":"total memory fault would exceed 200MB cap"}',
+            media_type="application/json",
+        )
     memory_hog.append(bytearray(mb * 1024 * 1024))
-    return {"memory_mb": mb}    
+    fault_state["memory_mb"] = current_total + mb
+    return {"memory_mb": mb}
 
 @app.post("/fault/reset")
 def fault_reset():
