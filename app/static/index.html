@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pulse</title>
+</head>
+<body>
+    <h1>Pulse</h1>
+    <p>Queue depth: <span id="queue_depth">-</span></p>
+    <p>Worker busy: <span id="worker_busy">-</span></p>
+
+
+    <input type="number" id="slow_ms" placeholder="ms">
+<button onclick="setSlow()">Set Slow</button>
+
+<script>
+    async function setSlow() {
+        const ms = document.getElementById("slow_ms").value;
+        await fetch(`/fault/slow?ms=${ms}`, { method: "POST" });
+    }
+</script>
+
+
+<input type="number" id="error_rate" placeholder="rate %">
+<button onclick="setError()">Set Error Rate</button>
+
+<script>
+    async function setError() {
+        const rate = document.getElementById("error_rate").value;
+        await fetch(`/fault/error?rate=${rate}`, { method: "POST" });
+    }
+</script>
+
+
+<input type="number" id="cpu_seconds" placeholder="seconds">
+<button onclick="setCpu()">Burn CPU</button>
+
+<input type="number" id="memory_mb" placeholder="MB">
+<button onclick="setMemory()">Allocate Memory</button>
+
+<script>
+    async function setCpu() {
+        const seconds = document.getElementById("cpu_seconds").value;
+        await fetch(`/fault/cpu?seconds=${seconds}`, { method: "POST" });
+    }
+
+    async function setMemory() {
+        const mb = document.getElementById("memory_mb").value;
+        await fetch(`/fault/memory?mb=${mb}`, { method: "POST" });
+    }
+</script>
+
+    <button onclick="resetFaults()">Reset Faults</button>
+
+<script>
+    async function resetFaults() {
+        await fetch("/fault/reset", { method: "POST" });
+    }
+</script>
+
+    <script>
+    async function updateState() {
+        const response = await fetch("/state");
+        const data = await response.json();
+        document.getElementById("queue_depth").textContent = data.queue_depth;
+        document.getElementById("worker_busy").textContent = data.worker_busy;
+        
+    }
+    updateState();
+    setInterval(updateState, 1000);
+</script>
+
+</body>
+</html>

@@ -7,6 +7,7 @@ import random
 
 from fastapi import FastAPI, Response, Query
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 job_queue = queue.Queue()
@@ -43,7 +44,7 @@ def readyz():
 
 @app.get("/")
 def root():
-    return {"service": "pulse"}
+    return FileResponse("app/static/index.html")
  
 @app.post("/jobs")
 def add_jobs(count: int = Query(..., ge=0, le=1000)):
@@ -55,7 +56,10 @@ def add_jobs(count: int = Query(..., ge=0, le=1000)):
 
 @app.get("/state")
 def state():
-    return {"queue_depth": job_queue.qsize()}
+    return {
+        "queue_depth": job_queue.qsize(),
+        "worker_busy": worker_busy._value.get(),
+    }
 
 @app.get("/metrics")
 def metrics():
