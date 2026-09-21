@@ -12,22 +12,38 @@
     <input type="number" id="slow_ms" placeholder="ms">
 <button onclick="setSlow()">Set Slow</button>
 
-<script>
-    async function setSlow() {
-        const ms = document.getElementById("slow_ms").value;
-        await fetch(`/fault/slow?ms=${ms}`, { method: "POST" });
-    }
-</script>
 
+<script>
+     async function postFault(url) {
+    const response = await fetch(url, { method: "POST" });
+    if (!response.ok) {
+        const error = await response.json();
+        let message = error.error || response.status;
+        if (error.detail && Array.isArray(error.detail)) {
+            message = error.detail[0].msg;
+        }
+        alert("Failed: " + message);
+        return;
+    }
+    const data = await response.json();
+    console.log("Success:", data);
+}
+     async function setSlow() {
+    const ms = document.getElementById("slow_ms").value;
+    await postFault(`/fault/slow?ms=${ms}`);
+}
+
+</script>
 
 <input type="number" id="error_rate" placeholder="rate %">
 <button onclick="setError()">Set Error Rate</button>
 
 <script>
-    async function setError() {
-        const rate = document.getElementById("error_rate").value;
-        await fetch(`/fault/error?rate=${rate}`, { method: "POST" });
-    }
+ async function setError() {
+    const rate = document.getElementById("error_rate").value;
+    await postFault(`/fault/error?rate=${rate}`);
+}
+
 </script>
 
 
@@ -39,22 +55,24 @@
 
 <script>
     async function setCpu() {
-        const seconds = document.getElementById("cpu_seconds").value;
-        await fetch(`/fault/cpu?seconds=${seconds}`, { method: "POST" });
-    }
+    const seconds = document.getElementById("cpu_seconds").value;
+    await postFault(`/fault/cpu?seconds=${seconds}`);
+}
 
-    async function setMemory() {
-        const mb = document.getElementById("memory_mb").value;
-        await fetch(`/fault/memory?mb=${mb}`, { method: "POST" });
-    }
+async function setMemory() {
+    const mb = document.getElementById("memory_mb").value;
+    await postFault(`/fault/memory?mb=${mb}`);
+}
+
 </script>
 
     <button onclick="resetFaults()">Reset Faults</button>
 
 <script>
-    async function resetFaults() {
-        await fetch("/fault/reset", { method: "POST" });
-    }
+     async function resetFaults() {
+    await postFault("/fault/reset");
+}
+
 </script>
 
     <script>
