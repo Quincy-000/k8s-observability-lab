@@ -19,12 +19,14 @@ fault_state = {
     "cpu_seconds": 0,
     "memory_mb": 0,
 }
+
 jobs_received_total = Counter("jobs_received_total", "Total jobs accepted")
 jobs_processed_total = Counter("jobs_processed_total", "Total jobs finished")
 jobs_failed_total = Counter("jobs_failed_total", "Total jobs failed", ["reason"])
 queue_depth = Gauge("queue_depth", "Jobs waiting in queue")
 worker_busy = Gauge("worker_busy", "Is the worker processing a job (1) or idle (0)")
 job_processing_seconds = Histogram("job_processing_seconds", "Time spent processing a job")
+cpu_burn_active = threading.Event()
 
 @app.get("/healthz")
 def healthz():
@@ -96,12 +98,20 @@ def burn_cpu(seconds: int):
     end_time = time.time() + seconds
     while time.time() < end_time:
         pass
+    cpu_burn_active.clear()
 
 @app.post("/fault/cpu")
 def fault_cpu(seconds: int = Query(..., ge=0, le=30)):
+    if cpu_burn_active.is_set():
+        return Response(
+            status_code=429,
+            content='{"error":"a CPU burn is already running"}',
+            media_type="application/json",
+        )
+    cpu_burn_active.set()
     fault_state["cpu_seconds"] = seconds
     threading.Thread(target=burn_cpu, args=(seconds,), daemon=True).start()
-    return {"cpu_seconds": seconds}    
+    return {"cpu_seconds": seconds} 
 
 memory_hog = []
 
