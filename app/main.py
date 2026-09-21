@@ -2,6 +2,7 @@ import queue
 import threading
 import time
 import random
+import os
 
 
 
@@ -44,7 +45,8 @@ def readyz():
 
 @app.get("/")
 def root():
-    return FileResponse("app/static/index.html")
+    static_dir = os.path.dirname(__file__)
+    return FileResponse(os.path.join(static_dir, "static", "index.html"))
  
 @app.post("/jobs")
 def add_jobs(count: int = Query(..., ge=0, le=1000)):
