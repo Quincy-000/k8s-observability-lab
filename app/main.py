@@ -95,10 +95,12 @@ def worker():
         job_queue.task_done()
         
 def burn_cpu(seconds: int):
-    end_time = time.time() + seconds
-    while time.time() < end_time:
-        pass
-    cpu_burn_active.clear()
+    try:
+        end_time = time.time() + seconds
+        while time.time() < end_time:
+            pass
+    finally:
+        cpu_burn_active.clear()
 
 @app.post("/fault/cpu")
 def fault_cpu(seconds: int = Query(..., ge=0, le=30)):
