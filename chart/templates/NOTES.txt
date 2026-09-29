@@ -1,0 +1,6 @@
+1. Pulse is deployed. Get access with:
+
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "chart.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:{{ .Values.service.port }}
+
+2. Then visit http://127.0.0.1:8080/ for the control page, or http://127.0.0.1:8080/metrics for raw Prometheus metrics.

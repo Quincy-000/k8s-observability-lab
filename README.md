@@ -31,13 +31,13 @@ being able to *operate* something — notice a problem, measure it, and prove wh
 | 4 | Fault injection endpoints | done |
 | 5 | Control page | done |
 | 6 | Container (Dockerfile) | done — 152 MB image, memory measured |
-| 7 | Helm chart (needs no cluster) | not started |
+| 7 | Helm chart (needs no cluster) | done — lint clean, renders verified |
 | 8 | Cluster — ask first | not started |
 | 9 | Monitoring stack — ask first | not started |
 | 10 | Proof: incidents and dashboard screenshots | not started |
 
-Current code: `app/main.py` (141 lines), `app/static/index.html` (73 lines), `Dockerfile`
-and `requirements.txt` (three dependencies). No tests and no chart yet.
+Current code: `app/main.py` (141 lines), `app/static/index.html` (73 lines), `Dockerfile`,
+`requirements.txt` (three dependencies) and `chart/` (Phase 7). Still no tests.
 
 ---
 
@@ -199,8 +199,8 @@ every design decision here, and it is the most honest part of the project.
 
 **What this changes downstream:**
 
-- The Helm chart (Phase 7) sets explicit CPU and memory requests and limits sized for this
-  box, with the arithmetic written down.
+- The Helm chart sets explicit CPU and memory requests and limits sized for this box, with
+  the arithmetic written down — see below.
 - The cluster (Phase 8) asks permission before starting, because minikube may simply not
   fit alongside VS Code.
 - The monitoring stack (Phase 9) is trimmed: no Alertmanager, and the etcd, scheduler and
@@ -209,6 +209,54 @@ every design decision here, and it is the most honest part of the project.
 The result is deliberately not the architecture you would choose with unlimited resources.
 It is the architecture that survives the machine it actually runs on — and the reasoning
 is written down at every step.
+
+---
+
+## The Helm chart
+
+`chart/`. One Deployment, one Service, and Helm's own test hook. Nothing else.
+
+`helm create` scaffolds a chart for a generic web app. Four of its files describe features this
+service does not have — a ServiceAccount, an HPA, an Ingress and an HTTPRoute. They were deleted
+rather than left switched off, because dead configuration still has to be read and understood by
+whoever comes next.
+
+| File | What it holds |
+|---|---|
+| `templates/deployment.yaml` | One container. Probes on `/healthz` and `/readyz`, hardcoded — those are the app's contract endpoints and will not change per-deployment, so making them configurable would only add a way to get them wrong. |
+| `templates/service.yaml` | ClusterIP on port 8000. |
+| `templates/tests/test-connection.yaml` | Helm's test hook. Reads the port from `.Values.service.port`, so it never needs editing when the port moves. |
+| `Chart.yaml` | `name: pulse`, `appVersion: "1.0.0"`. The generated `1.16.0` was nginx's version number, not ours. |
+| `values.yaml` | Four things: `replicaCount`, `image`, `service.port`, `resources`. |
+
+**The resource numbers are measured, not guessed** — recording them is most of the reason the
+chart exists:
+
+| | Request | Limit | Where the number comes from |
+|---|---|---|---|
+| Memory | 64Mi | 256Mi | ~35 MB idle and ~135 MB under a 100 MB fault, with headroom for the full 200 MB cap |
+| CPU | 50m | 250m | a `/fault/cpu` burn pegs a full core (measured at 100.88% in `docker stats`) |
+
+The CPU limit is deliberately low. At 250m it throttles that burn — which is the point: the fault
+then demonstrates two real phenomena instead of one, the burn itself and cluster CPU throttling,
+and it does so without letting a single lab service claim a whole core on a 2-CPU box.
+
+**Verified:**
+
+- `helm lint chart` — clean, `0 chart(s) failed`.
+- `helm template pulse chart` — checked line by line: `pulse:latest`, port 8000 in both the
+  Service and the probes, the resource numbers above, and the test pod picking up the port on
+  its own.
+- `helm install --dry-run` — **not possible without a cluster.** All three modes (plain,
+  `=client`, `=server`) fail with `Kubernetes cluster unreachable`, because Helm fetches cluster
+  capabilities even in client mode. So `lint` and `template` are the entire cluster-free
+  surface, and the dry run belongs to Phase 8.
+
+**One accepted limitation:** the image is tagged `latest` with `pullPolicy: IfNotPresent`. That is
+correct here — the image is built straight into minikube's own Docker, with no registry in
+between, so there is nothing to go stale. On a registry-backed cluster the same pair would
+silently run a cached build, and the fix would be a tag per build (the commit SHA) rather than
+`latest`.
 
 ---
 
@@ -238,13 +286,13 @@ running service: the shadowed `/fault/cpu` route, the per-request memory cap, th
 
 ## Not built yet
 
-No tests, no Helm chart (Phase 7), no `docs/` incident notes.
+No tests, no `docs/` incident notes.
 
 ---
 
 ## Roadmap
 
-1. **Phase 7** — Helm chart, parameterised and linting clean. Needs no cluster.
+1. **Phase 7** — done. The chart lives in `chart/`, lints clean, and renders without a cluster.
 2. **Phase 8** — cluster, once the memory arithmetic is agreed.
 3. **Phase 9** — Prometheus and Grafana, trimmed for this box. One dashboard: queue depth,
    jobs per second, failure rate, job duration.
