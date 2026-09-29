@@ -32,7 +32,7 @@ being able to *operate* something — notice a problem, measure it, and prove wh
 | 5 | Control page | done |
 | 6 | Container (Dockerfile) | done — 152 MB image, memory measured |
 | 7 | Helm chart (needs no cluster) | done — lint clean, renders verified |
-| 8 | Cluster — ask first | not started |
+| 8 | Cluster — ask first | done — minikube v1.35.1 at 2200m; Pulse deployed, probes passing |
 | 9 | Monitoring stack — ask first | not started |
 | 10 | Proof: incidents and dashboard screenshots | not started |
 
@@ -201,8 +201,9 @@ every design decision here, and it is the most honest part of the project.
 
 - The Helm chart sets explicit CPU and memory requests and limits sized for this box, with
   the arithmetic written down — see below.
-- The cluster (Phase 8) asks permission before starting, because minikube may simply not
-  fit alongside VS Code.
+- The cluster (Phase 8) was started only after the memory number was agreed, in a fresh
+  session with VS Code closed — with VS Code already open there were 890 MB free against a
+  2200m minimum.
 - The monitoring stack (Phase 9) is trimmed: no Alertmanager, and the etcd, scheduler and
   proxy targets are disabled, because on a box this size they cost more than they show.
 
@@ -252,11 +253,51 @@ and it does so without letting a single lab service claim a whole core on a 2-CP
   capabilities even in client mode. So `lint` and `template` are the entire cluster-free
   surface, and the dry run belongs to Phase 8.
 
-**One accepted limitation:** the image is tagged `latest` with `pullPolicy: IfNotPresent`. That is
-correct here — the image is built straight into minikube's own Docker, with no registry in
-between, so there is nothing to go stale. On a registry-backed cluster the same pair would
-silently run a cached build, and the fix would be a tag per build (the commit SHA) rather than
-`latest`.
+**The `latest` tag — corrected by what actually happened (Sep 29).** The prediction above was
+half wrong, and the real failure was worse. The image is built in WSL's Docker, *not* inside the
+node, so the node had no `pulse:latest` at all. Kubernetes read the bare name as a Docker Hub
+repository and tried to pull it: `Failed to pull image "pulse:latest": pull access denied for
+pulse, repository does not exist` — five attempts across 13 minutes, then `ErrImagePull` and 31
+back-offs, until the image was loaded into the node with `minikube image load pulse:latest`.
+
+Two lessons, both worth more than the guess:
+
+- A chart with no registry prefix and a `latest` tag fails *closed*, not open: it fails, and it
+  fails slowly, retrying with back-off for as long as you leave it.
+- With the tag pinned at `latest` and `pullPolicy: IfNotPresent`, a **rebuild does not reach a node
+  that already holds a copy**. Every rebuild needs `minikube image load` again, or a forced
+  rollout — nothing in the cluster will tell you the running build is older than your file.
+
+A tag per build (the commit SHA) makes both problems visible instead of silent.
+
+---
+
+## Running in the cluster
+
+Phase 8. Started Sep 29, 2026 on the box described above.
+
+| | |
+|---|---|
+| Cluster | minikube, docker driver, Kubernetes **v1.35.1** |
+| Allocation | `minikube start --memory=2200m --cpus=2` — minikube's own control-plane minimum |
+| Observed cost | the minikube container sits at ~700 MB of its 2.1 GB, control plane plus workloads |
+| Deployed | `helm install pulse ./chart` → release `pulse`, revision 1, status `deployed` |
+| Serving | `/`, `/healthz`, `/readyz`, `/state` all return 200; `/metrics` publishes the six numbers |
+| Test hook | `helm test pulse` → `pulse-test-connection` Completed |
+
+**Why the start was agreed in advance, and why the session mattered.** Measured mid-session with
+VS Code open: 4.0 GB used, ~890 MB available, 592 MB already in swap — against a 2200m minimum,
+so it would not have fitted. Measured at the start of a fresh session with VS Code not yet open:
+3.5 GB available and 249 MB of swap. Same machine, same command, 2.6 GB of difference, purely from
+*what was already running when the cluster asked for the memory*. WSL2 does not hand memory back
+promptly, so freeing things in a live session is not the same as starting clean.
+
+Also worth recording: the host has 7.8 GB of physical RAM with 0.7 GB free, so the 5 GB WSL cap in
+`.wslconfig` is not what binds — the machine does. Raising the cap is not an available move.
+
+**Known gap:** `kubectl top` reports `Metrics API not available` — that is minikube's
+metrics-server addon, not this chart. It is deliberately not enabled: it costs 50–100 MB of the
+2.1 GB, and Phase 9's Prometheus provides the same numbers for the dashboard.
 
 ---
 
@@ -293,7 +334,7 @@ No tests, no `docs/` incident notes.
 ## Roadmap
 
 1. **Phase 7** — done. The chart lives in `chart/`, lints clean, and renders without a cluster.
-2. **Phase 8** — cluster, once the memory arithmetic is agreed.
+2. **Phase 8** — done. minikube at 2200m; Pulse deployed, probes passing, test hook green.
 3. **Phase 9** — Prometheus and Grafana, trimmed for this box. One dashboard: queue depth,
    jobs per second, failure rate, job duration.
 4. **Phase 10** — run each fault, screenshot the dashboard before and after, and write one
