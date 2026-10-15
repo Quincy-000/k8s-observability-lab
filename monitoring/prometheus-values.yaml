@@ -1,0 +1,24 @@
+alertmanager:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      - job_name: pulse
+        scrape_interval: 5s
+        static_configs:
+          - targets: ["pulse.default.svc.cluster.local:8000"]
+
+server:
+  retention: 6h
+  persistentVolume:
+    enabled: false
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 384Mi }
