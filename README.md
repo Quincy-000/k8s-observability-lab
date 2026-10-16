@@ -33,8 +33,8 @@ being able to *operate* something — notice a problem, measure it, and prove wh
 | 6 | Container (Dockerfile) | done — 152 MB image, memory measured |
 | 7 | Helm chart (needs no cluster) | done — lint clean, renders verified |
 | 8 | Cluster — ask first | done — minikube v1.35.1 at 2200m; Pulse deployed, probes passing |
-| 9 | Monitoring stack — ask first | not started |
-| 10 | Proof: incidents and dashboard screenshots | not started |
+| 9 | Monitoring stack — ask first | done — Prometheus + Grafana in `monitoring/`; 7-panel dashboard saved as code |
+| 10 | Proof: incidents and dashboard screenshots | in progress — 01-slow written; 02–04 pending |
 
 Current code: `app/main.py` (141 lines), `app/static/index.html` (73 lines), `Dockerfile`,
 `requirements.txt` (three dependencies) and `chart/` (Phase 7). Still no tests.
@@ -327,7 +327,7 @@ running service: the shadowed `/fault/cpu` route, the per-request memory cap, th
 
 ## Not built yet
 
-No tests, no `docs/` incident notes.
+No tests. Incident 01 (slow jobs) is written; 02 (errors), 03 (CPU) and 04 (memory) are pending.
 
 ---
 
@@ -335,8 +335,9 @@ No tests, no `docs/` incident notes.
 
 1. **Phase 7** — done. The chart lives in `chart/`, lints clean, and renders without a cluster.
 2. **Phase 8** — done. minikube at 2200m; Pulse deployed, probes passing, test hook green.
-3. **Phase 9** — Prometheus and Grafana, trimmed for this box. One dashboard: queue depth,
-   jobs per second, failure rate, job duration.
+3. **Phase 9** — done. Prometheus and Grafana, trimmed for this box. The "Pulse" dashboard (7 panels:
+   up/down, CPU, memory, queue depth, throughput, failures, average duration) is saved as code in
+   `monitoring/dashboards/pulse.json`, because Grafana has no persistent storage on this cluster.
 4. **Phase 10** — run each fault, screenshot the dashboard before and after, and write one
    incident note per fault in `docs/incidents/`.
 
