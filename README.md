@@ -34,7 +34,7 @@ being able to *operate* something — notice a problem, measure it, and prove wh
 | 7 | Helm chart (needs no cluster) | done — lint clean, renders verified |
 | 8 | Cluster — ask first | done — minikube v1.35.1 at 2200m; Pulse deployed, probes passing |
 | 9 | Monitoring stack — ask first | done — Prometheus + Grafana in `monitoring/`; 7-panel dashboard saved as code |
-| 10 | Proof: incidents and dashboard screenshots | in progress — 01-slow written; 02–04 pending |
+| 10 | Proof: incidents and dashboard screenshots | done — five incidents written, four faults captured before and after |
 
 Current code: `app/main.py` (141 lines), `app/static/index.html` (73 lines), `Dockerfile`,
 `requirements.txt` (three dependencies) and `chart/` (Phase 7). Still no tests.
@@ -327,7 +327,8 @@ running service: the shadowed `/fault/cpu` route, the per-request memory cap, th
 
 ## Not built yet
 
-No tests. Incident 01 (slow jobs) is written; 02 (errors), 03 (CPU) and 04 (memory) are pending.
+No tests. Five incidents written: `01-slow`, `02-error`, `03-cpu`, `04-memory`, and
+`05-restart` — the last records the liveness-probe finding that came out of the fault runs.
 
 ---
 
@@ -338,8 +339,13 @@ No tests. Incident 01 (slow jobs) is written; 02 (errors), 03 (CPU) and 04 (memo
 3. **Phase 9** — done. Prometheus and Grafana, trimmed for this box. The "Pulse" dashboard (7 panels:
    up/down, CPU, memory, queue depth, throughput, failures, average duration) is saved as code in
    `monitoring/dashboards/pulse.json`, because Grafana has no persistent storage on this cluster.
-4. **Phase 10** — run each fault, screenshot the dashboard before and after, and write one
-   incident note per fault in `docs/incidents/`.
+4. **Phase 10** — done. Every fault was run, captured before and after, and written up in
+   `docs/incidents/`. The runs produced a fifth incident that was not planned: `05-restart`,
+   which traces the pod's eight restarts to a one-second liveness timeout rather than to any
+   fault. That finding is recorded with a proposed fix and left unapplied.
+5. **Phase 11 (not started)** — apply the probe fix in `chart/templates/deployment.yaml`
+   (liveness `timeoutSeconds` 1 → 3), redeploy, and re-run the four faults so the captures
+   describe the corrected chart rather than the leaky one.
 
 ---
 
