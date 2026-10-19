@@ -1,5 +1,7 @@
 # Pulse — a job queue service built to be observed
 
+[![tests](https://github.com/Quincy-000/k8s-observability-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Quincy-000/k8s-observability-lab/actions/workflows/tests.yml)
+
 A small HTTP service that accepts jobs, works through them in the background, publishes
 numbers about itself, and can be made to fail on command.
 
