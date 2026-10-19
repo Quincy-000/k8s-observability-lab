@@ -26,9 +26,20 @@ spec:
             httpGet:
               path: /healthz
               port: http
+            periodSeconds: 10
+            # 3s, not the 1s API default: a Python process limited to 250m can
+            # miss a one-second deadline while it is merely busy (a scrape, a
+            # GC pause, a fault). Incident 05 traces eight restarts to that.
+            timeoutSeconds: 3
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
+            periodSeconds: 10
+            # Readiness stays tight: failing it removes traffic, it does not
+            # kill the container.
+            timeoutSeconds: 1
+            failureThreshold: 2
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

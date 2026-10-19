@@ -51,7 +51,7 @@ one, which is the wrong question, and the cost is a restart loop that erases the
 evidence: restarting also resets every counter, which is why incident 04's memory
 spike could not be seen in any scrape.
 
-## The fix (not yet applied)
+## The fix
 
     livenessProbe:
       httpGet: { path: /healthz, port: http }
@@ -70,8 +70,35 @@ worst legitimate pause, or it becomes a restart generator. Three seconds is stil
 far below the 30-second kill window and comfortably above the ~0.5 s median
 processing time recorded in 01 and 02.
 
-This is recorded, not applied. Changing the chart means re-deploying and
-re-running the four incidents, which is a Phase 11 job.
+This is applied in Phase 11; the verification is in the next section.
+
+## Phase 11: what changed when it was applied
+
+Chart revision 2, pod `pulse-549c649674-jvswf`. Probes as the API reports them:
+
+    Liveness:   timeout=3s period=10s #success=1 #failure=3
+    Readiness:  timeout=1s period=10s #success=1 #failure=2
+
+The same memory fault that killed the pod three times in incident 04 was re-run against
+the new pod, with a warmed cluster and VS Code closed to free host memory.
+
+    restarts after the fault:      1   (was 3)
+    readiness:                     failed first — "dial tcp ... i/o timeout"
+    liveness:                      failed — "context deadline exceeded"
+    last termination:              Error, exit code 137
+
+So the fix helped and did not cure. Readiness did its job and pulled the pod out of
+service before liveness reached three strikes; when the container still had not answered
+after the thirty-second window, the kubelet sent SIGKILL and the exit code is **137 with
+reason `Error`** — not `OOMKilled`, because the kernel did not kill it, the kubelet did.
+
+**Why one restart remains.** The host had 4.8 GiB of RAM, 69 MiB free, and a full 2 GiB
+swap; the node had already flipped to `NotReady` six times in two and a half hours. Under
+200 MB of allocation on a machine in that state, the Python process stops answering for
+longer than three seconds — longer than thirty, in fact. No probe tuning fixes that. The
+remaining option is host memory: close the editor, or run the fault at 100 MB, or give WSL
+more RAM. That is an environment limit, recorded here rather than papered over with a
+fourth timeout value.
 
 ## Lesson
 

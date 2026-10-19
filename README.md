@@ -35,9 +35,11 @@ being able to *operate* something — notice a problem, measure it, and prove wh
 | 8 | Cluster — ask first | done — minikube v1.35.1 at 2200m; Pulse deployed, probes passing |
 | 9 | Monitoring stack — ask first | done — Prometheus + Grafana in `monitoring/`; 7-panel dashboard saved as code |
 | 10 | Proof: incidents and dashboard screenshots | done — five incidents written, four faults captured before and after |
+| 11 | Probe fix and app tests | done — liveness 3s; 14 pytest tests + CI; one restart survives the memory fault on a starved host |
 
 Current code: `app/main.py` (141 lines), `app/static/index.html` (73 lines), `Dockerfile`,
-`requirements.txt` (three dependencies) and `chart/` (Phase 7). Still no tests.
+`requirements.txt` (three dependencies), `chart/` (Phase 7) and `tests/` (14 pytest tests,
+run by GitHub Actions on every push).
 
 ---
 
@@ -327,8 +329,10 @@ running service: the shadowed `/fault/cpu` route, the per-request memory cap, th
 
 ## Not built yet
 
-No tests. Five incidents written: `01-slow`, `02-error`, `03-cpu`, `04-memory`, and
-`05-restart` — the last records the liveness-probe finding that came out of the fault runs.
+Fourteen pytest tests (`tests/test_app.py`) cover health, the queue, every fault endpoint
+and the metrics surface; GitHub Actions runs them on every push. Five incidents written:
+`01-slow`, `02-error`, `03-cpu`, `04-memory`, and `05-restart` — the last records the
+liveness-probe finding that came out of the fault runs, including what changed when it was fixed.
 
 ---
 
@@ -343,15 +347,23 @@ No tests. Five incidents written: `01-slow`, `02-error`, `03-cpu`, `04-memory`, 
    `docs/incidents/`. The runs produced a fifth incident that was not planned: `05-restart`,
    which traces the pod's eight restarts to a one-second liveness timeout rather than to any
    fault. That finding is recorded with a proposed fix and left unapplied.
-5. **Phase 11 (not started)** — apply the probe fix in `chart/templates/deployment.yaml`
-   (liveness `timeoutSeconds` 1 → 3), redeploy, and re-run the four faults so the captures
-   describe the corrected chart rather than the leaky one.
+5. **Phase 11** — done. The probe fix is applied (`timeoutSeconds: 3`, `failureThreshold: 3`
+   for liveness; readiness stays at 1s with 2 strikes) and deployed as chart revision 2.
+   Re-running the memory fault — the one that killed the pod three times — produced **one**
+   restart instead of three, and readiness correctly removed the pod from service first.
+   The survivor is a SIGKILL (exit 137) after the container stopped answering both probes:
+   at 200 MB of allocation on a 4.8 GiB host with swap full, the process is wedged for
+   longer than any sane liveness timeout. That residual is host memory, not probe tuning.
+6. **Not planned** — a re-capture of the four incidents against revision 2. The existing
+   screenshots document the leaky chart, which is the chart the incidents describe; the
+   verification numbers live in `05-restart.md` instead of being re-staged.
 
 ---
 
 ## Design rules
 
-- No database. No authentication. No frontend framework. No CI pipeline. No Terraform.
+- No database. No authentication. No frontend framework. No deployment pipeline. No Terraform.
+- GitHub Actions exists for one job only: running the tests.
 - Three dependencies. A fourth has to justify its cost in memory and complexity.
 - Every file under about 150 lines.
 - No secrets in committed files — `.env.example` only.
